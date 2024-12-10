@@ -4,10 +4,9 @@
 # include <vector>
 #include "pbPlots.h"
 #include "supportLib.h"
+#include "UserInterface.h"
 using namespace std;
 
-
-#include "supportLib.h"
 
 unsigned char* DoubleArrayToByteArray(vector<double>* data) {
     unsigned char* out;
@@ -63,19 +62,6 @@ The class provides a menu-driven interface for users to complete their assessmen
 
 */
 
-#include <iostream>
-#include <vector>
-#include <string>
-#include "UserInterface.h"
-//#include "CognitiveTest.h"
-//#include "LifestyleAssessment.h"
-//#include "GeneticAssessment.h"
-//#include "RiskAssessment.h"
-//#include "GraphicalReport.h"
-//#include "Recommendations.h"
-
-using namespace std;
-
 UserInterface::UserInterface() : currentScreen("menu") {} // Constructor that initializes currentScreen to the menu
 
 // Displays the main menu and returns the user's choice
@@ -107,7 +93,7 @@ void UserInterface::loadCognitiveTest() {
         cout << "Your response (A, B, C, or D): ";
         cin >> response;
         userResponses.push_back(response);
-        cognitiveTest.recordResponse(i, response);
+        cognitiveTest.recordResponse(i, string(1, response));
     }
 }
 
@@ -124,7 +110,7 @@ void UserInterface::loadLifestyleAssessment() {
         cout << "Your response (A, B, C, or D): ";
         cin >> response;
         userResponses.push_back(response);
-        lifestyleAssessment.recordResponse(i, response);
+        lifestyleAssessment.recordResponse(i, string(1, response));
     }
 }
 
@@ -141,7 +127,7 @@ void UserInterface::loadGeneticAssessment() {
         cout << "Your response (A or B): ";
         cin >> response;
         userResponses.push_back(response);
-        geneticAssessment.recordResponse(i, response);
+        geneticAssessment.recordResponse(i, string(1, response));
     }
 }
 
@@ -161,7 +147,8 @@ void UserInterface::loadResultsAndRecommendations() {
 
     // Calculate total risk and generate report
     RiskAssessment riskAssessment;
-    riskAssessment.totalRisk(cognitiveRisk, lifestyleRisk, geneticRisk);
+    riskAssessment.setTotalRisk(cognitiveRisk, lifestyleRisk, geneticRisk);
+    
     double totalRisk = riskAssessment.calculateFinalRisk();
     string riskReport = riskAssessment.generateRiskReport();
 
@@ -177,7 +164,7 @@ void UserInterface::loadResultsAndRecommendations() {
 
     // Generate recommendations based on total risk
     Recommendations recommendations;
-    recommendations.generateRecommendations();
+    recommendations.generateRecommendations(lifestyleRisk, geneticRisk, cognitiveRisk);
     recommendations.displayRecommendations();
 }
 
@@ -223,13 +210,21 @@ public:
     }
 };
 
+#pragma once
+#include "Assesment.h"
 // cognitive test sub class
 class CognitiveTest : public Assessment {
+private:
+    vector<string> cognitiveQuestions;
+    vector<vector<string>> cognitiveOptions;
+    vector<string> cognitiveAnswer;
+    double cognitiveRiskScore;
+
 public:
     // constructor 
     CognitiveTest() {
         // all 20 questions 
-        questions = { "Which of these is a color?",
+        cognitiveQuestions = { "Which of these is a color?",
             "What is 1 + 1?",
             "Which of these is a fruit?",
             "What do you use to drink water?",
@@ -251,7 +246,7 @@ public:
             "Which of these is a day of the week?" };
 
         // options to the question in the corresponding index
-        options = { {"Red", "Chair", "Dog", "I don't know"},
+        cognitiveOptions = { {"Red", "Chair", "Dog", "I don't know"},
             {"1", "2", "3", "I don't know"},
             {"Apple", "Chair", "Table", "I don't know"},
             {"Glass", "Shoes", "Blanket", "I don't know"},
@@ -260,7 +255,7 @@ public:
             {"Pen", "Shoe", "Spoon", "I don't know"},
             {"3", "4", "5", "I don't know"},
             {"Shoes", "Hat", "Jacket", "I don't know"},
-            {"Water", "Rock", "Paper", "I don;t know"},
+            {"Water", "Rock", "Paper", "I don't know"},
             {"Summer", "Winter", "Autumn", "I don't know"},
             {"Scissors", "Fork", "Plate", "I don't know"},
             {"Two", "Four", "Six", "I don't know"},
@@ -273,18 +268,38 @@ public:
             {"Monday", "January", "Summer", "I don't know"} };
     }
 
-    void displayQuestion(size_t index) {
-        if (index < questions.size()) {
-            cout << questions[index] << endl;
-            for (size_t i = 0; i < options[index].size(); i++) {
-                cout << static_cast<char>('A' + i) << ". " << options[index][i] << endl;
+    // function to display the question to the user with options
+    void displayQuestion(int index) {
+        // print the question
+        if (index >= 0 && index < cognitiveQuestions.size()) {
+            cout << "Question: " << index + 1 << ": " << cognitiveQuestions[index] << endl;
+
+            // char to represent the options
+            char answerOptions = 'A';
+
+            // print the options to the user
+            for (const string& option : cognitiveOptions[index]) {
+                cout << answerOptions << ") " << option << endl;
+                // increment the char
+                answerOptions++;
             }
+        }
+        // alert if there is an error
+        else {
+            cout << "Invalid Question." << endl;
         }
     }
 
-    void recordResponse(size_t index, char response) {
-        if (index < questions.size()) {
-            answer.push_back(string(1, response));
+    // record response function to add answer to the vector
+    void recordResponse(int index, const string& userAnswer) {
+        // make sure the answer is valid
+        if (index >= 0 && index < cognitiveAnswer.size()) {
+            // assign to the proper index in the array
+            cognitiveAnswer[index] = userAnswer;
+        }
+        else {
+            // alert if invalid
+            cout << "Invalid response." << endl;
         }
     }
 
@@ -297,11 +312,11 @@ public:
         double numIncorrect = 0;
 
         // determine if answer is correct, if not then add the proper point values
-        for (int i = 0; i < answer.size(); i++) {
-            if (answer[i].empty() || answer[i] != correctAnswers[i] && i <= 10) {
+        for (int i = 0; i < cognitiveAnswer.size(); i++) {
+            if (cognitiveAnswer[i].empty() || cognitiveAnswer[i] != correctAnswers[i] && i <= 10) {
                 numIncorrect++;
             }
-            else if (answer[i].empty() || answer[i] != correctAnswers[i] && (i > 10 && i <= 17)) {
+            else if (cognitiveAnswer[i].empty() || cognitiveAnswer[i] != correctAnswers[i] && (i > 10 && i <= 17)) {
                 numIncorrect = numIncorrect + 2;
             }
             else {
@@ -311,17 +326,200 @@ public:
 
         // determine risk score
         // 33 points possible
-        riskScore = 33 - numIncorrect;
+        cognitiveRiskScore = 33 - numIncorrect;
+    }
 
-        if (riskScore >= 25) {
-            cout << "Your stage based on your Cognitive Test: Low Risk.";
+    // return risk score
+    double getRisk() {
+        return cognitiveRiskScore;
+    }
+};
+
+#pragma once
+#include "Assesment.h"
+// genetic test sub class
+class GeneticAssessment : public Assessment {
+private:
+    vector<string> geneticQuestions;
+    vector<vector<string>> geneticOptions;
+    vector<string> geneticAnswer;
+    double geneticRiskScore;
+
+public:
+    // constructor 
+    GeneticAssessment() {
+        // all 5 questions 
+        geneticQuestions = { "Do you have genetic marker APOE-e4?",
+            "Do you have the genetic marker for Amyloid Precursor Protein (APP) on chromosome 21?",
+            "Do you have the genetic marker for Presenilin 1 (PSEN1) on chromosome 14?",
+            "Do you have the genetic marker for Presenilin 2 (PSEN2) on chromosome 1?",
+            "Do you have a family member who has been diagnosed with Alzheimer's Disease?" };
+
+        // options to the question in the corresponding index **ASK ABOUT THIS**
+        geneticOptions = { {"Yes", "No"},
+            {"Yes", "No"},
+            {"Yes", "No"},
+            {"Yes", "No"},
+            {"Yes", "No"} };
+    }
+
+    // function to display the question to the user with options
+    void displayQuestion(int index) {
+        // print the question
+        if (index >= 0 && index < geneticQuestions.size()) {
+            cout << "Question: " << index + 1 << ": " << geneticQuestions[index] << endl;
+
+            // char to represent the options
+            char answerOptions = 'A';
+
+            // print the options to the user
+            for (const string& option : geneticOptions[index]) {
+                cout << answerOptions << ") " << option << endl;
+                // increment the char
+                answerOptions++;
+            }
         }
-        else if (riskScore >= 16) {
-            cout << "Your stage based on your Cognitive Test: Moderate Risk.";
+        // alert if there is an error
+        else {
+            cout << "Invalid Question." << endl;
+        }
+    }
+
+    // record response function to add answer to the vector
+    void recordResponse(int index, const string& userAnswer) {
+        // make sure the answer is valid
+        if (index >= 0 && index < geneticAnswer.size()) {
+            // assign to the proper index in the array
+            geneticAnswer[index] = userAnswer;
         }
         else {
-            cout << "Your stage based on your Cognitive Test: High Risk.";
+            // alert if invalid
+            cout << "Invalid response." << endl;
         }
+    }
+
+    // calculate risk function to score the results
+    void calculateRisk() {
+        // populate the correct answers vector
+        vector <string> correctAnswers = { "A", "A", "A", "A", "A" };
+
+        // variable to keep track of num incorrect 
+        double numIncorrect = 0;
+
+        // determine if answer is correct, if not then add the proper point values
+        for (int i = 0; i < geneticAnswer.size(); i++) {
+            if (geneticAnswer[i].empty() || geneticAnswer[i] != correctAnswers[i] && i <= 10) {
+                numIncorrect++;
+            }
+        }
+
+        // determine risk score
+        // 5 points possible
+        geneticRiskScore =  5 - numIncorrect;
+    }
+
+    // return risk score
+    double getRisk() {
+        return geneticRiskScore;
+    }
+};
+
+#pragma once
+#include "Assesment.h"
+// lifestyle test sub class
+class LifestyleAssessment : public Assessment {
+private:
+    vector<string> lifestyleQuestions;
+    vector<vector<string>> lifestyleOptions;
+    vector<string> lifestyleAnswer;
+    double lifestyleRiskScore;
+
+public:
+    // constructor 
+    LifestyleAssessment() {
+        // all 10 questions 
+        lifestyleQuestions = { "How often do you drink water in a day?",
+            "Do you smoke cigarettes?",
+            "How often do you consume alcohol?",
+            "How often do you eat fruits or vegetables?",
+            "Do you have a regular exercise routine?",
+            "How often do you visit a doctor for checkups?",
+            "Do you take any prescribed medications as directed?",
+            "How often do you get at least 6-8 hours of sleep per night?",
+            "How often do you eat fast food or unhealthy snacks?",
+            "Do you feel confident managing your own hygiene (bathing, grooming, etc.)?" };
+
+        // options to the question in the corresponding index
+        lifestyleOptions = { {"Frequently (6 or more glasses)", "Occasionally (2-5 glasses)", "Rarely (1 or fewer glasses)", "I don't know"},
+            {"Yes, regularly", "Occasionally", "No, I don't smoke", "I don't know"},
+            {"Daily", "Occassionally", "Rarely or never", "I don't know"},
+            {"Everyday", "A few times a week", "Rarely or never", "I don't know"},
+            {"Yes, daily", "Occasionally (a few times a week)", "No, I don't exercise", "I don't know"},
+            {"Regularly (at least once a year)", "Occasionally (every few years)", "Rarely or never", "I don't know"},
+            {"Yes, always", "Sometimes", "No, I often forget", "I don't know"},
+            {"Almost ever night", "Occassionally", "Rarely", "I don't know"},
+            {"Frequently (multiple times a week)", "Occasionally (once or twice a week)", "Rarely or never", "I don't know"},
+            {"Yes, I manage it well", "I need occasional help", "I need regular assistance", "I don't know"} };
+    }
+
+    // function to display the question to the user with options
+    void displayQuestion(int index) {
+        // print the question
+        if (index >= 0 && index < lifestyleQuestions.size()) {
+            cout << "Question: " << index + 1 << ": " << lifestyleQuestions[index] << endl;
+
+            // char to represent the options
+            char answerOptions = 'A';
+
+            // print the options to the user
+            for (const string& option : lifestyleOptions[index]) {
+                cout << answerOptions << ") " << option << endl;
+                // increment the char
+                answerOptions++;
+            }
+        }
+        // alert if there is an error
+        else {
+            cout << "Invalid Question." << endl;
+        }
+    }
+
+    // record response function to add answer to the vector
+    void recordResponse(int index, const string& userAnswer) {
+        // make sure the answer is valid
+        if (index >= 0 && index < lifestyleAnswer.size()) {
+            // assign to the proper index in the array
+            lifestyleAnswer[index] = userAnswer;
+        }
+        else {
+            // alert if invalid
+            cout << "Invalid response." << endl;
+        }
+    }
+
+    // calculate risk function to score the results
+    void calculateRisk() {
+        // populate the correct answers vector
+        vector <string> correctAnswers = { "A", "C", "C", "A", "A", "A", "A", "A", "C", "A" };
+
+        // variable to keep track of num incorrect 
+        double numIncorrect = 0;
+
+        // determine if answer is correct, if not then add the proper point values
+        for (int i = 0; i < lifestyleAnswer.size(); i++) {
+            if (lifestyleAnswer[i].empty() || lifestyleAnswer[i] != correctAnswers[i]) {
+                numIncorrect++;
+            }
+        }
+
+        // determine risk score
+        // 10 points possible
+        lifestyleRiskScore = 10 - numIncorrect;
+    }
+
+    // return risk score
+    double getRisk() {
+        return lifestyleRiskScore;
     }
 };
 
